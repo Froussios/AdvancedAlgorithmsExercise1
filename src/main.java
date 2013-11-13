@@ -165,21 +165,26 @@ class Dynamic
 {	
 	private static int[][][][] memory = null;
 	
-	public static int search()
+	public static int searchRec()
 	{
-		Problem problem = Problem.LoadProblem();
+		Subset problem = new Subset();
 		
-		int n = problem.size();
-		memory = new int[n][n][n][n];
-		for (int i1=0 ; i1<n ; i1++ )
-			for (int i2 = 0; i2 < n; i2++)
-				for (int i3 = 0; i3 < n; i3++)
-					for (int i4 = 0; i4 < n; i4++)
-						memory[i1][i2][i3][i4] = -1;
+		int n = problem.count();
+		memory = new int[n][n][n][problem.totalLength()];
+		// Initialise all the elements to a non-value
+		for (int i1=0 ; i1<memory.length ; i1++ )
+			for (int i2 = 0; i2<memory[i1].length ; i2++)
+				for (int i3 = 0; i3 < memory[i1][i2].length; i3++)
+					for (int i4 = 0; i4 < memory[i1][i2][i3].length; i4++)
+						memory[i1][i2][i3][i4] = -3;
 		
 		ArrayList<Integer> sequence = new ArrayList<Integer>();
-		int tardiness = recursive(new Subset(0, algorithms.num_jobs-1, -1), 0, 0, sequence);
+		int tardiness = recursive(problem, 0, 0, sequence);
 		
+//		if ( sequence.size() != algorithms.num_jobs )
+//		{
+//			System.out.println("(Missing jobs in solution) ");
+//		}
 //		int real_tard = 0;
 //		int time = 0;
 //		for (Integer i : sequence)
@@ -190,64 +195,104 @@ class Dynamic
 //		} 
 //		System.out.print(">" + real_tard);
 //		System.out.println();
+//		System.out.println("Hits: " + hits + " Misses: " + misses);
 		
 		return tardiness;
 	}
 	
-	static int run(Problem problem, int t)
+	public static int search()
 	{
+		Subset problem = new Subset();
+		
+		int n = problem.count();
+		memory = new int[n][n][n][problem.totalLength()];
+		// Initialise all the elements to a non-value
+		for (int i1=0 ; i1<memory.length ; i1++ )
+			for (int i2 = 0; i2<memory[i1].length ; i2++)
+				for (int i3 = 0; i3 < memory[i1][i2].length; i3++)
+					for (int i4 = 0; i4 < memory[i1][i2][i3].length; i4++)
+						memory[i1][i2][i3][i4] = -3;
+		
+		int tardiness = run(problem, 0);
+		
+		return tardiness;
+	}
+	
+	static int run(Subset problem, int t)
+	{
+		
 		return -1;
 	}
 	
 	static int hits = 0;
 	static int misses = 0;
+	// Pseudo-recursive implementation of dynamic solution
 	static int recursive(Subset subset, int t, int depth, ArrayList<Integer> rvSeq)
 	{
 		// Count items
-		int n=0;
-		for ( int i=subset.i ; i<=subset.j ; i++ )
-			if ( subset.contains(i) )
-				n++;
+		int n= subset.count();
 		
 		// Subset is empty
 		if (n == 0)
 			return 0;
 		
+		// Check if solution already found
+		if ( subset.k >- 1 )
+		{
+			if ( memory[subset.i][subset.j][subset.k][t] >=0 )
+			{
+				hits++;
+				return memory[subset.i][subset.j][subset.k][t];
+			}
+		}
+		misses++;
+		
 		// Find k : k belongs to subset and has maximum length
 		int k = subset.maxLength();
 		
 		int best = Integer.MAX_VALUE;
-		ArrayList<Integer> best_sequence = null;
+		//ArrayList<Integer> best_sequence = null;
 		
 		for ( int split=k ; split <= subset.j ; split++ )
 		{
-			Subset subset1 = new Subset(subset.i,split,k);
-			Subset subset2 = new Subset(split+1,subset.j,k);
+			// Calculate subsets
+			if ( subset.k!=-1 )
+				if ( Job.length(subset.k) <= Job.length(k) )
+					System.out.print("");
 			
-			ArrayList<Integer> seqPre = new ArrayList<Integer>();
-			ArrayList<Integer> seqPost = new ArrayList<Integer>();
+			// TODO: use subset.k for subsets contain items of length k
+			Subset subset1 = new Subset(subset.i,split,k, subset);
+			Subset subset2 = new Subset(split+1,subset.j,k, subset);
+			
+			ArrayList<Integer> seqPre = null;// new ArrayList<Integer>();
+			ArrayList<Integer> seqPost = null; //new ArrayList<Integer>();
 			
 			int completion_k = t + subset1.totalLength() + Job.length(k);
 			
-			int tard1 = recursive(subset1, t, depth++, seqPre);
-			int tard2 = recursive(subset2, completion_k, depth++, seqPost);
+			// Calculate tardiness for subsets, k and total tardiness
+			int tard1 = recursive(subset1, t, depth+1, seqPre);
+			int tard2 = recursive(subset2, completion_k, depth+1, seqPost);
 			int tardk = Math.max(0, completion_k - Job.deadline(k));
 			
 			int tard = tard1 + tardk + tard2;
 			
+			// If new optimal solution is found
 			if ( tard < best )
 			{
 				best = tard;
-				best_sequence = seqPre;
-				best_sequence.add(k);
-				best_sequence.addAll(seqPost);
+				//best_sequence = seqPre;
+				//best_sequence.add(k);
+				//best_sequence.addAll(seqPost);
 			}
 		}
 		
 		if ( best == Integer.MAX_VALUE )
-			System.out.println("Failed to find solution: " + subset + " k:" + k);
+			System.err.println("Failed to find solution: S" + subset + " k:" + k);
 		
-		rvSeq.addAll(best_sequence);
+		//rvSeq.addAll(best_sequence);
+		
+		if ( subset.k > -1 )
+			memory[subset.i][subset.j][subset.k][t] = best;
 		
 		return best;
 	}
@@ -288,7 +333,7 @@ class Recursive
 		int k = problem.maxLength();
 		
 		int best = Integer.MAX_VALUE;
-		ArrayList<Integer> seqBest = null;
+		//ArrayList<Integer> seqBest = null;
 		
 		for ( int d=0 ; d <= n-k-1 ; d++ )
 		{
@@ -301,8 +346,8 @@ class Recursive
 			for ( int i=k+d+1 ; i<n ; i++ )
 				subproblem2.add(problem.get(i));
 			
-			ArrayList<Integer> seqPre = new ArrayList<Integer>();
-			ArrayList<Integer> seqPost = new ArrayList<Integer>();
+			ArrayList<Integer> seqPre = null;//new ArrayList<Integer>();
+			ArrayList<Integer> seqPost = null;//new ArrayList<Integer>();
 			
 			int tard1 = recursive(subproblem1, start, seqPre);
 			int finish_k = start + subproblem1.totalLength() + problem.get(k).length;
@@ -313,15 +358,15 @@ class Recursive
 			if (tard_k < best)
 			{
 				best = tard_k;
-				seqBest = seqPre;
-				seqBest.add(problem.get(k).job);
-				seqBest.addAll(seqPost);
+				//seqBest = seqPre;
+				//seqBest.add(problem.get(k).job);
+				//seqBest.addAll(seqPost);
 			}
 		}
 		
 		//System.out.println("\tJob " + problem.get(k) + " start: " + best_preceeding.totalLength() + " tardiness " + Math.max(0, start - problem.get(k).deadline));
 		
-		rvSeq.addAll(seqBest);
+		//rvSeq.addAll(seqBest);
 		
 		return best;
 	}
@@ -375,48 +420,84 @@ class BruteForce
 	}
 }
 
-class Subset
+class Subset extends ArrayList<Integer>
 {
 	public int i,j,k;
-	public Subset(int start/*inclusive*/, int end/*inclusive*/, int lessthan)
+	
+	// Loads the full problem
+	public Subset()
 	{
-		assert(start >= 0);
-		assert(end >= start);
+		super(algorithms.num_jobs);
+		this.i = 0;
+		this.j = algorithms.num_jobs-1;
+		this.k = -1;
+		for (int i = 0; i < algorithms.num_jobs; i++) 
+			this.add(i);
+		
+	}
+	public Subset(int start/*inclusive*/, int end/*inclusive*/, int pivot, Subset parentSet)
+	{
+		super(parentSet.size());
 		this.i = start;
 		this.j = end;
-		this.k = lessthan;
+		this.k = pivot;
+		for ( Integer i : parentSet )
+			if ( i >= start && i <= end )
+				if ( i != pivot )
+					this.add(i);
 	}
 	
-	public boolean contains(int job)
+//	public boolean contains(int job)
+//	{
+//		if ( k==-1 )
+//			return job >= i && job <= j ;
+//		else
+//			return job >= i 
+//				&& job <= j 
+//				&& Job.length(job) < Job.length(k);
+//	}
+	
+	public int count()
 	{
-		if ( k==-1 )
-			return job >= i && job <= j ;
-		else
-			return job >= i 
-				&& job <= j 
-				&& Job.length(job) < Job.length(k);
+//		int n=0;
+//		for ( int i=this.i ; i<=this.j ; i++ )
+//			if ( this.contains(i) )
+//				n++;
+//		return n;
+		return this.size();
 	}
 	
 	public int maxLength()
 	{
+//		int k = -22;
+//		for ( int i=this.i ; i<=this.j ; i++ )
+//			if ( this.contains(i) )
+//				if ( k==-22 )
+//					k = i;
+//				else
+//					if ( Job.length(k) < Job.length(i))
+//						k = i;
+//		return k;
 		int k = -22;
-		for ( int i=this.i ; i<=this.j ; i++ )
-			if ( this.contains(i) )
-				if ( k==-22 )
-					k = i;
-				else
-					if ( Job.length(k) < Job.length(i))
-						k = i;
+		for ( Integer i : this )
+			if ( k < 0 )
+				k = i;
+			else if ( Job.length(k) < Job.length(i) )
+				k = i;
 		return k;
 	}
+	
 	public int totalLength()
 	{
 		int total = 0;
-		for ( int i=this.i ; i<=this.j ; i++ )
-			if ( this.contains(i) )
-				total += Job.length(i);
+//		for ( int i=this.i ; i<=this.j ; i++ )
+//			if ( this.contains(i) )
+//				total += Job.length(i);
+		for ( Integer i : this )
+			total += Job.length(i);
 		return total;
 	}
+	
 	public String toString()
 	{
 		return "S(" + i + "," + j + "," + k + ")";
@@ -446,7 +527,7 @@ class Job
 	
 	public String toString()
 	{
-		return "" + job + " (" +length+","+deadline+")";
+		return "" + job + "(" +length+","+deadline+")";
 	}
 }
 
@@ -528,7 +609,7 @@ class algorithms {
     public static void main (String args[]) {
 		read_problem(args[0]);
 		
-		// Sort problem in non-decreasing order on deadline
+		// Sort problem in non-decreasing order of deadline
 		Arrays.sort(algorithms.jobs, new Comparator<int[]>() {
 				public int compare(int[] f1, int[] f2)
 					{
@@ -539,23 +620,28 @@ class algorithms {
 		
 		{
 			// DEBUGGING: Print problem
-			System.out.println("Problem: (length,due)");
-			for (int[] i : algorithms.jobs )
-				System.out.print( "(" + i[0] + "," +i [1] + "), ");
+			System.out.println("Problem: id(length,due)");
+			for (int i=0 ; i < algorithms.num_jobs ; i++ )
+				System.out.print(new Job(i) + " , ");
 			System.out.println();
 		}
 		
 		// Run brute force version of dynamic solution
-		System.out.print("Brute force: ");
-		System.out.println(BruteForce.search());
+		// Only for the smallest problems
+		//System.out.print("Brute force: ");
+		//System.out.println(BruteForce.search());
 		
-		// Run recursive version of dynamic solution
-		System.out.print("Recursive: ");
-		System.out.println(Recursive.search());
+		// Run dynamic programming solution (recursive method for debugging)
+		System.out.print("Dynamic (Recursive): ");
+		System.out.println(Dynamic.searchRec());
 		
 		// Run dynamic programming solution
 		System.out.print("Dynamic: ");
 		System.out.println(Dynamic.search());
+		
+		// Run recursive version of dynamic solution
+		System.out.print("Recursive: ");
+		System.out.println(Recursive.search());
 		
 		// Run greedy solution
 		System.out.print("Greedy: ");
