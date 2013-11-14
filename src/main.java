@@ -164,19 +164,27 @@ class best_first_search {
 class Dynamic
 {	
 	private static int[][][][] memory = null;
-	
-	public static int searchRec()
+	private static void initializeMemory()
 	{
-		Subset problem = new Subset();
+		int n = algorithms.jobs.length;
+		int P = 0;
+		for (int i = 0; i < algorithms.jobs.length; i++)
+			P += Job.length(i);
 		
-		int n = problem.count();
-		memory = new int[n][n][n][problem.totalLength()];
+		memory = new int[n][n][n][P];
 		// Initialise all the elements to a non-value
 		for (int i1=0 ; i1<memory.length ; i1++ )
 			for (int i2 = 0; i2<memory[i1].length ; i2++)
 				for (int i3 = 0; i3 < memory[i1][i2].length; i3++)
 					for (int i4 = 0; i4 < memory[i1][i2][i3].length; i4++)
 						memory[i1][i2][i3][i4] = -3;
+	}
+	
+	public static int searchRec()
+	{
+		Subset problem = new Subset();
+		
+		initializeMemory();
 		
 		ArrayList<Integer> sequence = new ArrayList<Integer>();
 		int tardiness = recursive(problem, 0, 0, sequence);
@@ -202,25 +210,69 @@ class Dynamic
 	
 	public static int search()
 	{
+		initializeMemory();
+		
 		Subset problem = new Subset();
 		
-		int n = problem.count();
-		memory = new int[n][n][n][problem.totalLength()];
-		// Initialise all the elements to a non-value
-		for (int i1=0 ; i1<memory.length ; i1++ )
-			for (int i2 = 0; i2<memory[i1].length ; i2++)
-				for (int i3 = 0; i3 < memory[i1][i2].length; i3++)
-					for (int i4 = 0; i4 < memory[i1][i2][i3].length; i4++)
-						memory[i1][i2][i3][i4] = -3;
-		
-		int tardiness = run(problem, 0);
+		int tardiness = run(problem);
 		
 		return tardiness;
 	}
 	
-	static int run(Subset problem, int t)
+	static int run(Subset problem)
 	{
-		
+		for ( int i=0 ; i<memory.length ; i++ )
+		{
+			for ( int j=i ; j<memory[i].length ; j++ )
+			{
+				for ( int k=0 ; k<=j ; k++ ) //TODO: k<=j ok?
+				{
+					for ( int t=0 ; t<memory[i][j][k].length ; t++ ) //TODO: can this be limited to P - sum(length(a): a in S(i,j,k))
+					{
+						int minTard = Integer.MAX_VALUE;
+						
+						ExperimentalSubset set = new ExperimentalSubset(i,j,k);
+						ArrayList<Integer> jobs = set.allElements();
+						
+						if ( jobs.size() == 0 )
+						{
+							// Set has no items
+							minTard = 0;
+						}
+						else if ( jobs.size() == 1 )
+						{
+							// Set has exactly one item
+							int job = jobs.get(0);
+							minTard = Math.max(0, t + Job.length(job) - Job.deadline(job));
+						}
+						else
+						{
+							int pivot = set.maxLength();
+							ArrayList<Integer> subset1 = new ArrayList<Integer>(jobs.subList(0, jobs.indexOf(pivot)));
+							ArrayList<Integer> subset2 = new ArrayList<Integer>(jobs.subList(jobs.indexOf(pivot)+1, jobs.size()-1));
+							
+							while (true)
+							{
+								ExperimentalSubset ss1 = new ExperimentalSubset(subset1);
+								ExperimentalSubset ss2 = new ExperimentalSubset(subset2);
+								
+								int pivotCompletion = t + ss1.totalLength();
+								int tard1 = memory[ss1.i][ss1.j][ss1.k][t];
+								int tard2 = memory[ss2.i][ss2.j][ss2.k][t+pivotCompletion];
+								int tardPivot = Math.max(0, pivotCompletion - Job.deadline(pivot));
+								
+								int totalTardiness = tard1 + tardPivot + tard2;
+								
+								if ( totalTardiness < minTard )
+									minTard = totalTardiness;
+							}
+						}
+						
+						memory[i][j][k][t] = minTard;
+					}
+				}
+			}
+		}
 		return -1;
 	}
 	
@@ -420,6 +472,103 @@ class BruteForce
 	}
 }
 
+class ExperimentalSubset
+{	
+	int i,j,k;
+	
+	public ExperimentalSubset(int i, int j, int k)
+	{
+		this.i = i;
+		this.j = j;
+		this.k = k;		
+	}
+	
+	// This receives a collection of elements and reverse-engineers
+	// and reverse-engineers an appropriate definition of the form S(i,j,k)
+	public ExperimentalSubset(List<Integer> sortedElements)
+	{
+		// Sort by job id (already in non-decreasing deadline order)
+		//Collections.sort(sortedElements); // Given?
+		this.i = sortedElements.get(0);
+		this.j = sortedElements.get(sortedElements.size()-1);
+		
+		int maxElementLength = Integer.MIN_VALUE;
+		for ( Integer i : sortedElements )
+			if ( maxElementLength < Job.length(i) )
+				maxElementLength = Job.length(i);
+		
+		// Scan the entire problem to find a k that is minimally bigger than maxElementLength
+		this.k = -1;
+		int kVal = Integer.MAX_VALUE;
+		for ( int i=0 ; i<algorithms.num_jobs ; i++ )
+			if ( Job.length(i) - maxElementLength > 0 && Job.length(i) < kVal )
+			{
+				this.k = i;
+				kVal = Job.length(i);
+			}
+		if ( kVal == Integer.MAX_VALUE )
+			// No k was found with length greater than every element in the element list
+			// The element list contains one of the elements with the maximum length possible
+			kVal += 0; //TODO: handle it
+	}
+	
+	public boolean contains(int job)
+	{
+		if ( k==-1 )
+			return job >= i && job <= j ;
+		else
+			return job >= i 
+				&& job <= j 
+				&& Job.length(job) < Job.length(k);
+	}
+	
+	public int count()
+	{
+		int n=0;
+		for ( int i=this.i ; i<=this.j ; i++ )
+			if ( this.contains(i) )
+				n++;
+		return n;
+	}
+	
+	public int maxLength()
+	{
+		int k = -22;
+		for ( int i=this.i ; i<=this.j ; i++ )
+			if ( this.contains(i) )
+				if ( k==-22 )
+					k = i;
+				else
+					if ( Job.length(k) < Job.length(i))
+						k = i;
+		return k;
+	}
+	
+	public int totalLength()
+	{
+		int total = 0;
+		for ( int i=this.i ; i<=this.j ; i++ )
+			if ( this.contains(i) )
+				total += Job.length(i);
+		return total;
+	}
+	
+	public ArrayList<Integer> allElements()
+	{
+		ArrayList<Integer> rv = new ArrayList<Integer>();
+		for ( int job = i ; job <= j ; job++ )
+			if (  contains(job) )
+				rv.add(job);
+		return rv;
+	}
+	
+	public String toString()
+	{
+		return "S("+i+","+j+","+k+")";
+	}
+}
+
+@SuppressWarnings("serial")
 class Subset extends ArrayList<Integer>
 {
 	public int i,j,k;
@@ -605,8 +754,8 @@ class algorithms {
 		}
 	}
 
-	// reads a problem, and outputs the result of both greedy and best-first
-    public static void main (String args[]) {
+	public static void main(String args[])
+	{
 		read_problem(args[0]);
 		
 		// Sort problem in non-decreasing order of deadline
@@ -626,6 +775,29 @@ class algorithms {
 			System.out.println();
 		}
 		
+		interactiveDebugging();
+		
+		runAlgorithms();
+	}
+
+	private static void interactiveDebugging() {
+		String strin = "";
+		Scanner in = new Scanner(new InputStreamReader(System.in));
+		while ( !in.equals("done") )
+		{
+			strin = in.nextLine();
+			String[] elements = strin.split(",");
+			ArrayList<Integer> ints = new ArrayList<Integer>();
+			for (String str : elements)
+				ints.add(Integer.parseInt(str));
+			ExperimentalSubset es = new ExperimentalSubset(ints);
+			System.out.println(es);
+		}
+	}
+	
+	// reads a problem, and outputs the result of both greedy and best-first
+    public static void runAlgorithms ()
+    {		
 		// Run brute force version of dynamic solution
 		// Only for the smallest problems
 		//System.out.print("Brute force: ");
