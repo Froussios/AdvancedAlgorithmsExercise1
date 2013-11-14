@@ -171,13 +171,13 @@ class Dynamic
 		for (int i = 0; i < algorithms.jobs.length; i++)
 			P += Job.length(i);
 		
-		memory = new int[n][n][n][P];
+		memory = new int[n][n][n][P+1];
 		// Initialise all the elements to a non-value
 		for (int i1=0 ; i1<memory.length ; i1++ )
 			for (int i2 = 0; i2<memory[i1].length ; i2++)
 				for (int i3 = 0; i3 < memory[i1][i2].length; i3++)
 					for (int i4 = 0; i4 < memory[i1][i2][i3].length; i4++)
-						memory[i1][i2][i3][i4] = -3;
+						memory[i1][i2][i3][i4] = Integer.MAX_VALUE;
 	}
 	
 	public static int searchRec()
@@ -221,9 +221,9 @@ class Dynamic
 	
 	static int run(Subset problem)
 	{
-		for ( int i=0 ; i<memory.length ; i++ )
+		for ( int j=0 ; j<memory[0].length ; j++ )
 		{
-			for ( int j=i ; j<memory[i].length ; j++ )
+			for ( int i=0 ; i<=j ; i++ )
 			{
 				for ( int k=0 ; k<=j ; k++ ) //TODO: k<=j ok?
 				{
@@ -232,39 +232,56 @@ class Dynamic
 						int minTard = Integer.MAX_VALUE;
 						
 						ExperimentalSubset set = new ExperimentalSubset(i,j,k);
-						ArrayList<Integer> jobs = set.allElements();
+						//ArrayList<Integer> jobs = set.allElements();
 						
-						if ( jobs.size() == 0 )
+						int setSize = set.count();
+						
+						if ( setSize == 0 )
 						{
 							// Set has no items
 							minTard = 0;
 						}
-						else if ( jobs.size() == 1 )
+						else if ( setSize == 1 )
 						{
 							// Set has exactly one item
-							int job = jobs.get(0);
+							//int job = jobs.get(0);
+							int job = set.first();
 							minTard = Math.max(0, t + Job.length(job) - Job.deadline(job));
 						}
 						else
 						{
 							int pivot = set.maxLength();
-							ArrayList<Integer> subset1 = new ArrayList<Integer>(jobs.subList(0, jobs.indexOf(pivot)));
-							ArrayList<Integer> subset2 = new ArrayList<Integer>(jobs.subList(jobs.indexOf(pivot)+1, jobs.size()-1));
 							
-							while (true)
+							for ( int split=pivot ; split <= set.j ; split++ )
 							{
-								ExperimentalSubset ss1 = new ExperimentalSubset(subset1);
-								ExperimentalSubset ss2 = new ExperimentalSubset(subset2);
+								// Calculate subsets
+								ExperimentalSubset subset1 = new ExperimentalSubset(set.i, split, pivot);
+								ExperimentalSubset subset2 = new ExperimentalSubset(split+1,set.j, pivot);
 								
-								int pivotCompletion = t + ss1.totalLength();
-								int tard1 = memory[ss1.i][ss1.j][ss1.k][t];
-								int tard2 = memory[ss2.i][ss2.j][ss2.k][t+pivotCompletion];
-								int tardPivot = Math.max(0, pivotCompletion - Job.deadline(pivot));
+								int pivotCompletion = t + subset1.totalLength() + Job.length(k);
+								if ( pivotCompletion >= memory[0][0][0].length )
+								{
+									continue;
+								}
 								
-								int totalTardiness = tard1 + tardPivot + tard2;
+								// Calculate tardiness for subsets, k and total tardiness
+								int tard1 = memory[subset1.i][subset1.j][subset1.k][t];
+								int tard2 = (subset2.i <= subset2.j) ? memory[subset2.i][subset2.j][subset2.k][pivotCompletion] : 0;
+								int tardk = Math.max(0, pivotCompletion - Job.deadline(k));
 								
-								if ( totalTardiness < minTard )
-									minTard = totalTardiness;
+								int tard = tard1 + tardk + tard2;
+								if ( tard1 == Integer.MAX_VALUE || tard2 == Integer.MAX_VALUE )
+									tard = Integer.MAX_VALUE;
+								if ( tard < 0 )
+								{
+									System.out.println("busted");
+								}
+								
+								// If new optimal solution is found
+								if ( tard < minTard )
+								{
+									minTard = tard;
+								}
 							}
 						}
 						
@@ -273,7 +290,10 @@ class Dynamic
 				}
 			}
 		}
-		return -1;
+		
+		// Calculate tardiness for the whole problem
+		int k = problem.maxLength();
+		return memory[0][problem.size()-1][k][0];
 	}
 	
 	static int hits = 0;
@@ -291,7 +311,8 @@ class Dynamic
 		// Check if solution already found
 		if ( subset.k >- 1 )
 		{
-			if ( memory[subset.i][subset.j][subset.k][t] >=0 )
+			int mem = memory[subset.i][subset.j][subset.k][t];
+			if ( mem >=0 && mem != Integer.MAX_VALUE )
 			{
 				hits++;
 				return memory[subset.i][subset.j][subset.k][t];
@@ -474,7 +495,7 @@ class BruteForce
 
 class ExperimentalSubset
 {	
-	int i,j,k;
+	public int i,j,k;
 	
 	public ExperimentalSubset(int i, int j, int k)
 	{
@@ -487,6 +508,12 @@ class ExperimentalSubset
 	// and reverse-engineers an appropriate definition of the form S(i,j,k)
 	public ExperimentalSubset(List<Integer> sortedElements)
 	{
+		if (sortedElements.size()==0)
+		{
+			i = j = k = 0;
+			return;
+		}
+			
 		// Sort by job id (already in non-decreasing deadline order)
 		//Collections.sort(sortedElements); // Given?
 		this.i = sortedElements.get(0);
@@ -517,9 +544,8 @@ class ExperimentalSubset
 		if ( k==-1 )
 			return job >= i && job <= j ;
 		else
-			return job >= i 
-				&& job <= j 
-				&& Job.length(job) < Job.length(k);
+			return ( job >= i && job <= j )
+				&& ( Job.length(job) < Job.length(k) || ( Job.length(job)==Job.length(k) && job<k ) );
 	}
 	
 	public int count()
@@ -553,7 +579,15 @@ class ExperimentalSubset
 		return total;
 	}
 	
-	public ArrayList<Integer> allElements()
+	public int first()
+	{
+		for ( int i=this.i ; i<=this.j ; i++ )
+			if ( contains(i) )
+				return i;
+		return -3;
+	}
+	
+	public ArrayList<Integer> allElements_disabled()
 	{
 		ArrayList<Integer> rv = new ArrayList<Integer>();
 		for ( int job = i ; job <= j ; job++ )
@@ -775,7 +809,7 @@ class algorithms {
 			System.out.println();
 		}
 		
-		interactiveDebugging();
+		//interactiveDebugging();
 		
 		runAlgorithms();
 	}
