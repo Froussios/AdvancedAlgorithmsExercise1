@@ -221,18 +221,27 @@ class Dynamic
 	
 	static int run(Subset problem)
 	{
-		for ( int j=0 ; j<memory[0].length ; j++ )
+		int n = algorithms.num_jobs;
+//		for ( int j=0 ; j<memory[0].length ; j++ )
+//		{
+//			for ( int i=0 ; i<=j ; i++ )
+//			{
+//				for ( int k=0 ; k<=j ; k++ ) //TODO: k<=j ok?
+//				{
+//					for ( int t=0 ; t<memory[i][j][k].length ; t++ ) //TODO: can this be limited to P - sum(length(a): a in S(i,j,k))
+		for ( int frame = 1 ; frame < n ; frame++ )
 		{
-			for ( int i=0 ; i<=j ; i++ )
+			for ( int i=0 ; i < n-frame ; i++ )
 			{
-				for ( int k=0 ; k<=j ; k++ ) //TODO: k<=j ok?
+				int j = i + frame;
+				for ( int k=0 ; k<=j ; k++ )
 				{
-					for ( int t=0 ; t<memory[i][j][k].length ; t++ ) //TODO: can this be limited to P - sum(length(a): a in S(i,j,k))
+					ExperimentalSubset set = new ExperimentalSubset(i,j,k);
+					//System.out.println("Filling: " + set);
+					
+					for ( int t=0 ; t<memory[i][j][k].length ; t++ )
 					{
 						int minTard = Integer.MAX_VALUE;
-						
-						ExperimentalSubset set = new ExperimentalSubset(i,j,k);
-						//ArrayList<Integer> jobs = set.allElements();
 						
 						int setSize = set.count();
 						
@@ -244,7 +253,6 @@ class Dynamic
 						else if ( setSize == 1 )
 						{
 							// Set has exactly one item
-							//int job = jobs.get(0);
 							int job = set.first();
 							minTard = Math.max(0, t + Job.length(job) - Job.deadline(job));
 						}
