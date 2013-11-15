@@ -163,6 +163,7 @@ class best_first_search {
 
 class Dynamic
 {	
+	// the memoy used by the dynamic pogramming implementation
 	private static int[][][][] memory = null;
 	private static void initializeMemory()
 	{
@@ -180,6 +181,7 @@ class Dynamic
 						memory[i1][i2][i3][i4] = Integer.MAX_VALUE;
 	}
 	
+	// Runs the iterative implementation of the dynamic programming solution
 	public static int search()
 	{
 		initializeMemory();
@@ -189,6 +191,8 @@ class Dynamic
 		return tardiness;
 	}
 	
+	// Creates a sorted list of all the jobs in the specified range.
+	// The items are in non-decreasing order of length
 	public static ArrayList<Integer> sortByLength(int rangeStart, int rangeEnd)
 	{
 		ArrayList<Integer> pivotsInOrderOfLength = new ArrayList<Integer>();
@@ -275,6 +279,10 @@ class Dynamic
 	}
 }
 
+
+// Implements the subset S(i,j,k), as defined in section 3 of the Lawler (1977) paper.
+// The definition is extended to include jobs that have processing time equal to k and
+// are positioned before k in a non-decreasing deadline ordering of the jobs
 class Subset
 {	
 	public int i,j,k;
@@ -283,9 +291,10 @@ class Subset
 	{
 		this.i = i;
 		this.j = j;
-		this.k = k;		
+		this.k = k;
 	}
 	
+	// Returns true if the job is contained in the set
 	public boolean contains(int job)
 	{
 		if ( job >= i && job <= j )
@@ -300,6 +309,7 @@ class Subset
 		return false;
 	}
 	
+	// Returns the number of jobs that are actually in the set
 	public int count()
 	{
 		int n=0;
@@ -309,6 +319,9 @@ class Subset
 		return n;
 	}
 	
+	// Returns the job with the maximum processing time from the set
+	// If multiple jobs fit the criterion, it returns the right-most in a
+	// non-decreasing deadline ordering of the jobs.
 	public int maxLength()
 	{
 		int rv = -22;
@@ -324,6 +337,7 @@ class Subset
 		return rv;
 	}
 	
+	// Returns the sum of the processing time of all the jobs contained in this set
 	public int totalLength()
 	{
 		int total = 0;
@@ -333,6 +347,8 @@ class Subset
 		return total;
 	}
 	
+	// Returns the left-most
+	// If the set is empty, a non-value is returned instead
 	public int first()
 	{
 		for ( int i=this.i ; i<=this.j ; i++ )
